@@ -1,0 +1,12 @@
+[submodule "Scripts"]
+	path = Scripts
+	url = https://github.com/OSVVM/OSVVM-Scripts.git
+[submodule "Common"]
+	path = Common
+	url = https://github.com/OSVVM/OSVVM-Common.git
+[submodule "osvvm"]
+	path = osvvm
+	url = https://github.com/OSVVM/OSVVM.git
+[submodule "Documentation"]
+	path = Documentation
+	url = git@github.com:OSVVM/Documentation.git
