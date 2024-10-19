@@ -10,3 +10,6 @@
 [submodule "Documentation"]
 	path = Documentation
 	url = git@github.com:OSVVM/Documentation.git
+[submodule "OSVVM-Common"]
+	path = OSVVM-Common
+	url = git@github.com:OSVVM/OSVVM-Common.git
