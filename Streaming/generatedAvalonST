@@ -1,0 +1,218 @@
+library ieee ;
+  use ieee.std_logic_1164.all ;
+  use ieee.numeric_std.all ;
+  use ieee.numeric_std_unsigned.all ;
+  use ieee.math_real.all ;
+
+library osvvm ;
+  context osvvm.OsvvmContext ;
+  use osvvm.ScoreboardPkg_slv.all ;
+
+entity AvalonStreamTransmitter is
+  generic (
+    MODEL_ID_NAME  : string := "" ;
+    INIT_CHANNEL   : std_logic_vector := "" ;
+    tperiod_Clk    : time := 10 ns ;
+    DEFAULT_DELAY  : time := 1 ns ;
+    tpd_Clk_Valid  : time := DEFAULT_DELAY ;
+    tpd_Clk_Data   : time := DEFAULT_DELAY ;
+    tpd_Clk_SOP    : time := DEFAULT_DELAY ;
+    tpd_Clk_EOP    : time := DEFAULT_DELAY ;
+    tpd_Clk_Channel : time := DEFAULT_DELAY
+  ) ;
+  port (
+    -- Globals
+    Clk         : in  std_logic ;
+    nReset      : in  std_logic ;
+
+    -- Avalon Streaming Interface
+    Valid       : out std_logic ;
+    Ready       : in  std_logic ;
+    Data        : out std_logic_vector ;
+    StartOfPacket : out std_logic ;
+    EndOfPacket : out std_logic ;
+    Channel     : out std_logic_vector ;
+
+    -- Testbench Transaction Interface
+    TransRec    : inout StreamRecType
+  ) ;
+
+  -- Derive Avalon interface properties from interface signals
+  constant AVALON_STREAM_DATA_WIDTH : integer := Data'length ;
+  constant AVALON_CHANNEL_WIDTH     : integer := Channel'length ;
+
+  -- Use MODEL_ID_NAME Generic if set, otherwise,
+  -- use model instance label (preferred if set as entityname_1)
+  constant MODEL_INSTANCE_NAME : string :=
+    ifelse(MODEL_ID_NAME'length > 0, MODEL_ID_NAME, 
+      to_lower(PathTail(AvalonStreamTransmitter'PATH_NAME))) ;
+
+end entity AvalonStreamTransmitter ;
+
+architecture SimpleTransmitter of AvalonStreamTransmitter is
+  signal ModelID, BusFailedID : AlertLogIDType ;
+  signal BurstCov : DelayCoverageIDType ;
+  
+  signal UseCoverageDelays : Boolean := FALSE ;
+
+  signal TransmitFifo : osvvm.ScoreboardPkg_slv.ScoreboardIDType ;
+
+  signal TransmitRequestCount, TransmitDoneCount : integer := 0 ;
+
+  -- Verification Component Configuration
+  signal TransmitReadyTimeOut : integer := 0 ;  -- No timeout
+
+  signal ParamChannel : std_logic_vector(Channel'range) := ifelse(INIT_CHANNEL'length > 0, INIT_CHANNEL, (Channel'range => '0')) ;
+  signal ValidDelayCycles : integer := 0 ;
+
+begin
+
+  ------------------------------------------------------------
+  --  Initialize alerts
+  ------------------------------------------------------------
+  Initialize : process
+    variable ID : AlertLogIDType ;
+  begin
+    -- Alerts
+    ID               := NewID(MODEL_INSTANCE_NAME) ;
+    ModelID          <= ID ;
+    BusFailedID      <= NewID("No response", ID) ;
+    TransmitFifo     <= NewID("TransmitFifo", ID, ReportMode => DISABLED, Search => PRIVATE_NAME) ; 
+    wait ;
+  end process Initialize ;
+
+
+  ------------------------------------------------------------
+  --  Transaction Dispatcher
+  --    Dispatches transactions to
+  ------------------------------------------------------------
+  TransactionDispatcher : process
+    variable DataVal : std_logic_vector(Data'range) ;
+    variable Param   : std_logic_vector(TransRec.ParamToModel'length-1 downto 0) ;
+    variable PopValid : boolean ;
+  begin
+    wait for 0 ns ; 
+    TransRec.BurstFifo <= NewID("TxBurstFifo", ModelID, Search => PRIVATE_NAME) ;
+    BurstCov           <= NewID("DelayCov", ModelID, ReportMode => DISABLED, Search => NAME_AND_PARENT) ;
+    
+    DispatchLoop : loop 
+      WaitForTransaction(
+         Clk      => Clk,
+         Rdy      => TransRec.Rdy,
+         Ack      => TransRec.Ack
+      ) ;
+
+      case TransRec.Operation is
+        when WAIT_FOR_CLOCK =>
+          WaitForClock(Clk, TransRec.IntToModel) ;
+
+        when WAIT_FOR_TRANSACTION =>
+          if TransmitRequestCount /= TransmitDoneCount then
+            wait until TransmitRequestCount = TransmitDoneCount ;
+          end if ;
+
+        when GET_TRANSACTION_COUNT =>
+          TransRec.IntFromModel <= TransmitDoneCount ;
+          wait for 0 ns ;
+
+        when GET_ALERTLOG_ID =>
+          TransRec.IntFromModel <= integer(ModelID) ;
+          wait for 0 ns ;
+
+        when SEND | SEND_ASYNC =>
+          DataVal := SafeResize(ModelID, TransRec.DataToModel, DataVal'length) ;
+          Param   := SafeResize(ModelID, TransRec.ParamToModel, TransRec.ParamToModel'length) ;
+          Push(TransmitFifo, '0' & DataVal & Param) ;
+          Increment(TransmitRequestCount) ;
+          wait for 0 ns ;
+          if IsBlocking(TransRec.Operation) then
+            wait until TransmitRequestCount = TransmitDoneCount ;
+          end if ;
+
+        when SEND_BURST | SEND_BURST_ASYNC =>
+          -- Avalon Streaming burst handling
+          Param   := SafeResize(ModelID, TransRec.ParamToModel, TransRec.ParamToModel'length) ;
+          TransmitRequestCount <= TransmitRequestCount + TransRec.IntToModel ;
+          for i in TransRec.IntToModel-1 downto 0 loop
+            Pop(TransmitFifo, DataVal, PopValid) ;
+            AlertIfNot(ModelID, PopValid, "TransmitFifo Empty during burst transfer", FAILURE) ;
+            Push(TransmitFifo, '1' & DataVal & Param) ;
+          end loop ;
+
+          wait for 0 ns ;
+          if IsBlocking(TransRec.Operation) then
+            wait until TransmitRequestCount = TransmitDoneCount ;
+          end if ;
+
+        when SET_MODEL_OPTIONS =>
+          case AxiStreamOptionsType'val(TransRec.Options) is
+            when TRANSMIT_VALID_DELAY_CYCLES =>
+              ValidDelayCycles <= TransRec.IntToModel ;
+              UseCoverageDelays <= FALSE ; 
+
+            when TRANSMIT_READY_TIME_OUT =>
+              TransmitReadyTimeOut <= TransRec.IntToModel ;
+
+            when DEFAULT_CHANNEL =>
+              ParamChannel <= SafeResize(ModelID, TransRec.ParamToModel, ParamChannel'length) ;
+
+            when others =>
+              Alert(ModelID, "SetOptions, Unimplemented Option: " & to_string(AxiStreamOptionsType'val(TransRec.Options)), FAILURE) ;
+              wait for 0 ns ;
+          end case ;
+
+        when GET_MODEL_OPTIONS =>
+          case AxiStreamOptionsType'val(TransRec.Options) is
+            when TRANSMIT_VALID_DELAY_CYCLES =>
+              TransRec.IntFromModel <= ValidDelayCycles ;
+
+            when TRANSMIT_READY_TIME_OUT =>
+              TransRec.IntFromModel <=  TransmitReadyTimeOut ;
+
+            when DEFAULT_CHANNEL =>
+              TransRec.ParamFromModel <= SafeResize(ModelID, ParamChannel, TransRec.ParamFromModel'length) ;
+
+            when others =>
+              Alert(ModelID, "GetOptions, Unimplemented Option: " & to_string(AxiStreamOptionsType'val(TransRec.Options)), FAILURE) ;
+          end case ;
+
+        -- The End -- Done
+        when others =>
+          -- Signal multiple Driver Detect or not implemented transactions.
+          Alert(ModelID, ClassifyUnimplementedTransmitterOperation(TransRec), FAILURE) ;
+      end case ;
+
+      -- Wait for 1 delta cycle, required if a wait is not in all case branches above
+      wait for 0 ns ;
+    end loop DispatchLoop ;
+  end process TransactionDispatcher ;
+
+
+  ------------------------------------------------------------
+  --  TransmitHandler
+  ------------------------------------------------------------
+  TransmitHandler : process
+    variable DataOut : std_logic_vector(Data'range) ;
+    variable SOP : std_logic ;
+    variable EOP : std_logic ;
+    variable ChannelOut : std_logic_vector(Channel'range) ;
+  begin
+    while true loop
+      Pop(TransmitFifo, DataOut, SOP, EOP, ChannelOut) ;
+
+      Valid        <= '1' after tpd_Clk_Valid ;
+      Data         <= DataOut after tpd_Clk_Data ;
+      StartOfPacket <= SOP after tpd_Clk_SOP ;
+      EndOfPacket <= EOP after tpd_Clk_EOP ;
+      Channel     <= ChannelOut after tpd_Clk_Channel ;
+
+      wait until Ready = '1' ;
+
+      -- Wait for the handshake completion and clear signals
+      Valid        <= '0' after tpd_Clk_Valid ;
+      StartOfPacket <= '0' after tpd_Clk_SOP ;
+      EndOfPacket <= '0' after tpd_Clk_EOP ;
+    end loop ;
+  end process TransmitHandler ;
+
+end architecture SimpleTransmitter ;

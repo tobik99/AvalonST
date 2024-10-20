@@ -1,0 +1,21 @@
+# VHDL Language Server Configuration for OSVVM Libraries
+
+[options]
+# Optional: Additional include directories
+include_dirs = [
+    "Common/",
+    "osvvm/",
+    "OSVVM_Common/",
+    "AvalonStreamingSlaveVC/",
+    "DpRam/",
+    "Streaming/"
+]
+
+[libraries]
+# Specify each library and its files
+Common = { files = ["Common/**/*.vhd"] }
+osvvm = { files = ["osvvm/**/*.vhd"] }
+OSVVM_Common = { files = ["OSVVM_Common/**/*.vhd"] }
+AvalonStreamingSlaveVC = { files = ["AvalonStreamingSlaveVC/**/*.vhd"] }
+DpRam = { files = ["DpRam/**/*.vhd"] }
+Streaming = { files = ["Streaming/**/*.vhd"] }

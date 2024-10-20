@@ -1,0 +1,36 @@
+# //  Questa Intel Starter FPGA Edition-64
+# //  Version 2023.3 win64 Jul 17 2023
+# //
+# //  Copyright 1991-2023 Mentor Graphics Corporation
+# //  All Rights Reserved.
+# //
+# //  QuestaSim and its associated documentation contain trade
+# //  secrets and commercial or financial information that are the property of
+# //  Mentor Graphics Corporation and are privileged, confidential,
+# //  and exempt from disclosure under the Freedom of Information Act,
+# //  5 U.S.C. Section 552. Furthermore, this information
+# //  is prohibited from disclosure under the Trade Secrets Act,
+# //  18 U.S.C. Section 1905.
+# //
+# do run_tb.tcl
+# D:OsvvmLibrariesosvvm
+# D:OsvvmLibrariesAvalonStreamingSlaveVCsrc
+# D:OsvvmLibrariesAvalonStreamingSlaveVC	estbench
+# ** Warning: (vlib-34) Library already exists at "work".
+# Errors: 0, Warnings: 1
+# Questa Intel Starter FPGA Edition-64 vmap 2023.3 Lib Mapping Utility 2023.07 Jul 17 2023
+# vmap osvvm D:OsvvmLibrariesosvvm 
+# Modifying modelsim.ini
+# ** Error (suppressible): (vmap-19) Failed to access library 'osvvm' at "D:OsvvmLibrariesosvvm".
+# No such file or directory. (errno = ENOENT)
+# Error in macro ./run_tb.tcl line 10
+# Questa Intel Starter FPGA Edition-64 vmap 2023.3 Lib Mapping Utility 2023.07 Jul 17 2023
+# vmap osvvm D:OsvvmLibrariesosvvm 
+# Modifying modelsim.ini
+# ** Error (suppressible): (vmap-19) Failed to access library 'osvvm' at "D:OsvvmLibrariesosvvm".
+# No such file or directory. (errno = ENOENT)
+#     while executing
+# "error [FixExecError $msg]"
+#     (procedure "vmap" line 29)
+#     invoked from within
+# "vmap osvvm $osvvm_path"

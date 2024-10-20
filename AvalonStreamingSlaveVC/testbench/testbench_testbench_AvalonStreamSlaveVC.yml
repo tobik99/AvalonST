@@ -1,0 +1,30 @@
+Version: "2024.09"
+Date: 2024-10-16T13:17:13+02:00
+TestSuites: 
+  - Name: DefaultLib
+    TestCases:
+      - TestCaseName: "StreamingTest"
+        TestCaseFileName: "StreamingTest"
+        Generics:            {}
+        ElapsedTime: 0.643
+    ElapsedTime: 0.646
+BuildInfo:
+  StartTime:            2024-10-16T13:17:13+02:00
+  FinishTime:           2024-10-16T13:17:23+02:00
+  Elapsed:              10.502
+  Simulator:            "QuestaSim -gui"
+  SimulatorVersion:     "2023.3"
+  OsvvmVersion:         "2024.09"
+  BuildErrorCode:       0
+  AnalyzeErrorCount:    3
+  SimulateErrorCount:   0
+OsvvmSettingsInfo:
+  BaseDirectory:        ""
+  ReportsSubdirectory:  "reports"
+  SimulationLogFile: "logs/QuestaSim-2023.3/testbench_testbench_AvalonStreamSlaveVC.log"
+  SimulationHtmlLogFile: "logs/QuestaSim-2023.3/testbench_testbench_AvalonStreamSlaveVC_log.html"
+  RequirementsSubdirectory: ""
+  CoverageSubdirectory: ""
+  Report2CssFiles:
+    - "reports/CssOsvvmStyle.css"
+  Report2PngFile:  "reports/OsvvmLogo.png"
